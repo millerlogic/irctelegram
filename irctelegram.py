@@ -105,6 +105,10 @@ def main():
             elif cmd == "NOTICE":
                 if bot:
                     bot.sendMessage(chat_id=args[0], text="Notice: " + args[1])
+            elif cmd == "PING":
+                send(":telegram PONG telegram :" + (args[0] if len(args) else ""))
+            elif cmd == "PONG":
+                pass
             elif cmd == "QUIT":
                 send("X :Quit: " + ("" if len(args) == 0 else args[0]))
                 break
