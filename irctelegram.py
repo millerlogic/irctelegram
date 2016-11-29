@@ -30,12 +30,23 @@ def nickfromuser(fromuser):
     return safename(((fromuser.first_name or "_") + "_" + (fromuser.last_name or "_")).strip("_"))
 
 
+def target_to_chat_id(target):
+    if target.startswith("#") or target.startswith("+"):
+        return target[1:]
+    return target
+
+
 def on_msg(bot, update):
     fromuser = update.message.from_user
     ident = safename(fromuser.username) if fromuser.username else str(fromuser.id)
     nick = nickfromuser(fromuser)
     fromwho = nick + "!" + ident + "@" + str(fromuser.id) + ".telegram"
-    before = ":" + fromwho + " PRIVMSG " + str(update.message.chat_id) + " :"
+    target = str(update.message.chat_id)
+    if update.message.chat.type == "channel":
+        target = "+" + target
+    elif update.message.chat.type == "group" or update.message.chat.type == "supergroup":
+        target = "#" + target
+    before = ":" + fromwho + " PRIVMSG " + target + " :"
     for msg in update.message.text.splitlines():
         if update.message.forward_from:
             send(before + "Forwarded from " + nickfromuser(update.message.forward_from) + ": " + msg)
@@ -97,14 +108,15 @@ def main():
                 if not connected:
                     connected = True
                     send(":telegram 001 " + botnick + " :Welcome to Telegram")
-                    send(":telegram 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii :are supported by this server")
+                    send(":telegram 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii CHANTYPES=#&!+ :are supported by this server")
                     send(":telegram 422 " + botnick + " :No MOTD")
             elif cmd == "PRIVMSG":
                 if bot:
+                    chat_id = target_to_chat_id(args[0])
                     if args[1].startswith("\1ACTION "):
-                        bot.sendMessage(chat_id=args[0], text=" * " + args[1][8:].rstrip("\1"))
+                        bot.sendMessage(chat_id=chat_id, text=" * " + args[1][8:].rstrip("\1"))
                     else:
-                        bot.sendMessage(chat_id=args[0], text=args[1])
+                        bot.sendMessage(chat_id=chat_id, text=args[1])
             elif cmd == "NOTICE":
                 if bot:
                     bot.sendMessage(chat_id=args[0], text="Notice: " + args[1])
