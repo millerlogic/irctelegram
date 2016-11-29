@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def send(line):
     import sys
-    sys.stdout.write(line)
+    sys.stdout.write(line.encode('utf-8'))
     sys.stdout.write("\n")
 
 
