@@ -37,7 +37,10 @@ def on_msg(bot, update):
     fromwho = nick + "!" + ident + "@" + str(fromuser.id) + ".telegram"
     before = ":" + fromwho + " PRIVMSG " + str(update.message.chat_id) + " :"
     for msg in update.message.text.splitlines():
-        send(before + msg)
+        if update.message.forward_from:
+            send(before + "Forwarded from " + nickfromuser(update.message.forward_from) + ": " + msg)
+        else:
+            send(before + msg)
     flush()
 
 
