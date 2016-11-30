@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
+from telegram.error import BadRequest
 import logging
 
 # Enable logging
@@ -78,6 +79,16 @@ def irc_parse(s):
     return prefix, cmd, args
 
 
+def sendbotmsg(bot, chat_id, msg, parse_mode=None):
+    if parse_mode:
+        try:
+            return bot.sendMessage(chat_id=chat_id, text=msg, parse_mode=parse_mode)
+        except BadRequest as e:
+            return bot.sendMessage(chat_id=chat_id, text=msg + "\n\n(Error: " + e.message + ")")
+    else:
+        return bot.sendMessage(chat_id=chat_id, text=msg)
+
+
 def main():
     
     updater = None
@@ -85,6 +96,7 @@ def main():
     bot = None
     botnick = "bot"
     connected = False
+    parse_mode = None
     
     try:
         send("X :Waiting for PASS with Telegram bot token")
@@ -108,22 +120,27 @@ def main():
                 if not connected:
                     connected = True
                     send(":telegram 001 " + botnick + " :Welcome to Telegram")
-                    send(":telegram 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii CHANTYPES=#&!+ :are supported by this server")
+                    send((":telegram 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii CHANTYPES=#&!+" +
+                        "TPARSEMODE=IRC,HTML,Markdown :are supported by this server"))
                     send(":telegram 422 " + botnick + " :No MOTD")
             elif cmd == "PRIVMSG":
                 if bot:
                     chat_id = target_to_chat_id(args[0])
                     if args[1].startswith("\1ACTION "):
-                        bot.sendMessage(chat_id=chat_id, text=" * " + args[1][8:].rstrip("\1"))
+                        sendbotmsg(bot, chat_id, " * " + args[1][8:].rstrip("\1"), parse_mode)
                     else:
-                        bot.sendMessage(chat_id=chat_id, text=args[1])
+                        sendbotmsg(bot, chat_id, args[1], parse_mode)
             elif cmd == "NOTICE":
                 if bot:
-                    bot.sendMessage(chat_id=args[0], text="Notice: " + args[1])
+                    sendbotmsg(bot, chat_id, "Notice: " + args[1], parse_mode)
             elif cmd == "PING":
                 send(":telegram PONG telegram :" + (args[0] if len(args) else ""))
             elif cmd == "PONG":
                 pass
+            elif cmd == "TPARSEMODE":
+                if len(args) > 0:
+                    parse_mode = None if args[0].upper() == "IRC" else args[0]
+                send(":telegram 300 :" + ("IRC" if not parse_mode else parse_mode))
             elif cmd == "QUIT":
                 send("X :Quit: " + ("" if len(args) == 0 else args[0]))
                 break
