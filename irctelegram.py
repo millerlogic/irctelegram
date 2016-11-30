@@ -32,7 +32,7 @@ def nickfromuser(fromuser):
 
 
 def target_to_chat_id(target):
-    if target.startswith("#") or target.startswith("+"):
+    if target.startswith("#") or target.startswith("+") or target.startswith("&"):
         return target[1:]
     return target
 
@@ -47,6 +47,8 @@ def on_msg(bot, update):
         target = "+" + target
     elif update.message.chat.type == "group" or update.message.chat.type == "supergroup":
         target = "#" + target
+    else:
+        target = "&" + target
     before = ":" + fromwho + " PRIVMSG " + target + " :"
     for msg in update.message.text.splitlines():
         if update.message.forward_from:
