@@ -80,13 +80,16 @@ def irc_parse(s):
 
 
 def sendbotmsg(bot, chat_id, msg, parse_mode=None):
-    if parse_mode:
-        try:
-            return bot.sendMessage(chat_id=chat_id, text=msg, parse_mode=parse_mode)
-        except BadRequest as e:
-            return bot.sendMessage(chat_id=chat_id, text=msg + "\n\n(Error: " + e.message + ")")
-    else:
-        return bot.sendMessage(chat_id=chat_id, text=msg)
+    try:
+        if parse_mode:
+            try:
+                return bot.sendMessage(chat_id=chat_id, text=msg, parse_mode=parse_mode)
+            except BadRequest as e:
+                return bot.sendMessage(chat_id=chat_id, text=msg + "\n\n(Error: " + e.message + ")")
+        else:
+            return bot.sendMessage(chat_id=chat_id, text=msg)
+    except BadRequest as e:
+        send("X :Unable to send message; " + e.message)
 
 
 def main():
