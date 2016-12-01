@@ -12,6 +12,9 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
+SERVER_NAME = "irctelegram.bridge"
+
+
 def send(line):
     import sys
     sys.stdout.write(line.encode('utf-8'))
@@ -41,7 +44,7 @@ def on_msg(bot, update):
     fromuser = update.message.from_user
     ident = safename(fromuser.username) if fromuser.username else str(fromuser.id)
     nick = nickfromuser(fromuser)
-    fromwho = nick + "!" + ident + "@" + str(fromuser.id) + ".telegram"
+    fromwho = nick + "!" + ident + "@" + str(fromuser.id) + "." + SERVER_NAME
     target = str(update.message.chat_id)
     if update.message.chat.type == "channel":
         target = "+" + target
@@ -124,10 +127,10 @@ def main():
                 botnick = args[0]
                 if not connected:
                     connected = True
-                    send(":telegram 001 " + botnick + " :Welcome to Telegram")
-                    send((":telegram 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii CHANTYPES=#&!+" +
-                        "TPARSEMODE=IRC,HTML,Markdown :are supported by this server"))
-                    send(":telegram 422 " + botnick + " :No MOTD")
+                    send(":" + SERVER_NAME + " 001 " + botnick + " :Welcome to Telegram")
+                    send((":" + SERVER_NAME + " 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii" +
+                        " CHANTYPES=#&!+ TPARSEMODE=IRC,HTML,Markdown :are supported by this server"))
+                    send(":" + SERVER_NAME + " 422 " + botnick + " :No MOTD")
             elif cmd == "PRIVMSG":
                 if bot:
                     chat_id = target_to_chat_id(args[0])
@@ -139,18 +142,18 @@ def main():
                 if bot:
                     sendbotmsg(bot, chat_id, "Notice: " + args[1], parse_mode)
             elif cmd == "PING":
-                send(":telegram PONG telegram :" + (args[0] if len(args) else ""))
+                send(":" + SERVER_NAME + " PONG " + SERVER_NAME + " :" + (args[0] if len(args) else ""))
             elif cmd == "PONG":
                 pass
             elif cmd == "TPARSEMODE":
                 if len(args) > 0:
                     parse_mode = None if args[0].upper() == "IRC" else args[0]
-                send(":telegram 300 :" + ("IRC" if not parse_mode else parse_mode))
+                send(":" + SERVER_NAME + " 300 :" + ("IRC" if not parse_mode else parse_mode))
             elif cmd == "QUIT":
                 send("X :Quit: " + ("" if len(args) == 0 else args[0]))
                 break
             elif cmd:
-                send(":telegram 421 " + cmd + " :Unknown command")
+                send(":" + SERVER_NAME + " 421 " + cmd + " :Unknown command")
             flush()
     except KeyboardInterrupt as e:
         send("X :Interrupted")
