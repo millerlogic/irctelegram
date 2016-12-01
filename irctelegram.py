@@ -131,6 +131,12 @@ def main():
                     send((":" + SERVER_NAME + " 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii" +
                         " CHANTYPES=#&!+ TPARSEMODE=IRC,HTML,Markdown :are supported by this server"))
                     send(":" + SERVER_NAME + " 422 " + botnick + " :No MOTD")
+            elif cmd == "USER":
+                pass
+            elif cmd == "JOIN":
+                pass
+            elif cmd == "PART":
+                pass
             elif cmd == "PRIVMSG":
                 if bot:
                     chat_id = target_to_chat_id(args[0])
