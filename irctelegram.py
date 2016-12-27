@@ -129,7 +129,7 @@ def main():
                     connected = True
                     send(":" + SERVER_NAME + " 001 " + botnick + " :Welcome to Telegram")
                     send((":" + SERVER_NAME + " 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii" +
-                        " CHANTYPES=#&!+ TPARSEMODE=IRC,HTML,Markdown :are supported by this server"))
+                        " CHANTYPES=#&!+ TPARSEMODE=IRC,HTML,Markdown NICKLEN=500 :are supported by this server"))
                     send(":" + SERVER_NAME + " 422 " + botnick + " :No MOTD")
             elif cmd == "USER":
                 pass
