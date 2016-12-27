@@ -111,6 +111,8 @@ def main():
         import sys
         while True:
             line = sys.stdin.readline()
+            if not line:
+                break
             prefix, cmd_orig, args = irc_parse(line)
             cmd = cmd_orig.upper()
             if cmd == "PASS":
@@ -166,10 +168,10 @@ def main():
     except Exception as e:
         logger.error(e, exc_info=True)
         send("X :Error")
-    
-    if updater:
-        flush()
-        updater.stop()
+    finally:
+        if updater:
+            updater.stop()
+            flush()
 
 
 if __name__ == '__main__':
