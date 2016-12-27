@@ -31,6 +31,8 @@ def safename(s):
 
 
 def nickfromuser(fromuser):
+    if fromuser.username:
+        return safename(fromuser.username)
     return safename(((fromuser.first_name or "_") + "_" + (fromuser.last_name or "_")).strip("_"))
 
 
