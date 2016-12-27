@@ -1,3 +1,3 @@
 #!/bin/sh
 
-exec /usr/sbin/inetd -f -e /irctelegram/irctelegram_inetd.conf
+exec /usr/sbin/inetd -f -e /etc/irctelegram/irctelegram_inetd.conf

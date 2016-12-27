@@ -3,7 +3,7 @@ service irctelegram
     disable         = no
     user            = irctelegram
     wait            = no
-    server          = /irctelegram/irctelegram.py
+    server          = /etc/irctelegram/irctelegram.py
     socket_type     = stream
     protocol        = tcp
     port            = 28281
