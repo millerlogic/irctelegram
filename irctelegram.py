@@ -117,6 +117,7 @@ def main():
                 break
             prefix, cmd_orig, args = irc_parse(line)
             cmd = cmd_orig.upper()
+            chat_id = None # make sure this isn't set to the old value.
             if cmd == "PASS":
                 if not updater:
                     updater = Updater(args[0])
@@ -150,6 +151,7 @@ def main():
                         sendbotmsg(bot, chat_id, args[1], parse_mode)
             elif cmd == "NOTICE":
                 if bot:
+                    chat_id = target_to_chat_id(args[0])
                     sendbotmsg(bot, chat_id, "Notice: " + args[1], parse_mode)
             elif cmd == "PING":
                 send(":" + SERVER_NAME + " PONG " + SERVER_NAME + " :" + (args[0] if len(args) else ""))
