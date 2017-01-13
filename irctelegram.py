@@ -42,7 +42,7 @@ def target_to_chat_id(target):
     return target
 
 
-def on_msg(bot, update):
+def get_msg_info(bot, update):
     fromuser = update.message.from_user
     ident = safename(fromuser.username) if fromuser.username else str(fromuser.id)
     nick = nickfromuser(fromuser)
@@ -54,12 +54,25 @@ def on_msg(bot, update):
         target = "#" + target
     else:
         target = "&" + target
+    return nick, fromwho, target
+
+
+def on_msg(bot, update):
+    _, fromwho, target = get_msg_info(bot, update)
     before = ":" + fromwho + " PRIVMSG " + target + " :"
     for msg in update.message.text.splitlines():
         if update.message.forward_from:
             send(before + "Forwarded from " + nickfromuser(update.message.forward_from) + ": " + msg)
         else:
             send(before + msg)
+    flush()
+
+
+def on_sticker(bot, update):
+    _, fromwho, target = get_msg_info(bot, update)
+    sticker = update.message.sticker
+    sticker_id = sticker.file_id
+    send(":" + fromwho + " PRIVMSG " + target + " :\1TELEGRAM-STICKER " + str(sticker_id) + "\1")
     flush()
 
 
@@ -96,7 +109,17 @@ def sendbotmsg(bot, chat_id, msg, parse_mode=None):
         else:
             return bot.sendMessage(chat_id=chat_id, text=msg)
     except BadRequest as e:
-        send("X :Unable to send message; " + e.message)
+        send("X :Unable to send message: " + e.message)
+
+
+def sendbotsticker(bot, chat_id, sticker):
+    try:
+        try:
+            bot.sendSticker(chat_id=chat_id, sticker=sticker)
+        except BadRequest as e:
+            return bot.sendMessage(chat_id=chat_id, text="(sticker)\n\n(Error: " + e.message + ")")
+    except BadRequest as e:
+        send("X :Unable to send sticker: " + repr(sticker))
 
 
 def main():
@@ -125,6 +148,7 @@ def main():
                     bot = dp.bot
                     #dp.add_handler(CommandHandler("start", start))
                     dp.add_handler(MessageHandler([Filters.text], on_msg))
+                    dp.add_handler(MessageHandler([Filters.sticker], on_sticker))
                     dp.add_error_handler(error) # log all errors
                     #updater.job_queue.put(Job(asdfasdf, 10, repeat=True, context=None))
                     updater.start_polling()
@@ -146,7 +170,9 @@ def main():
                 if bot:
                     chat_id = target_to_chat_id(args[0])
                     if args[1].startswith("\1ACTION "):
-                        sendbotmsg(bot, chat_id, " * " + args[1][8:].rstrip("\1"), parse_mode)
+                        sendbotmsg(bot, chat_id, " * " + botnick + " " + args[1][8:].rstrip("\1"), parse_mode)
+                    elif args[1].startswith("\1TELEGRAM-STICKER "):
+                        sendbotsticker(bot, chat_id, args[1][18:].rstrip("\1"))
                     else:
                         sendbotmsg(bot, chat_id, args[1], parse_mode)
             elif cmd == "NOTICE":
