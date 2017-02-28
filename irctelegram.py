@@ -99,11 +99,46 @@ def irc_parse(s):
     return prefix, cmd, args
 
 
+import re
+# Note: this does not remove bold (x02) or reset (x0F), as we will handle them.
+irc_parse_rex = re.compile("\x1f|\x12|\x16|\x03(?:\\d{1,2}(?:,\\d{1,2})?)?", re.UNICODE)
+irc_handle_rex = re.compile("\x02|\x0F", re.UNICODE)
+
+
+def ircToHTML(msg):
+    xmsg = irc_parse_rex.sub("", msg)
+    import cgi
+    xmsg = cgi.escape(xmsg)
+    state = {"bold":False}
+    def handlebold(x):
+        if x == "\x0F":
+            if state["bold"]:
+                state["bold"] = False
+                return "</b>"
+            return ""
+        if x == "\x02":
+            if state["bold"]:
+                state["bold"] = False
+                return "</b>"
+            state["bold"] = True
+            return "<b>"
+    xmsg = irc_handle_rex.sub(lambda m: handlebold(m.group()), xmsg)
+    if state["bold"]:
+        xmsg += "</b>"
+        #state["bold"] = False
+    return xmsg
+
+
 def sendbotmsg(bot, chat_id, msg, parse_mode=None):
     try:
         if parse_mode:
             try:
-                return bot.sendMessage(chat_id=chat_id, text=msg, parse_mode=parse_mode)
+                xparsemode = parse_mode
+                xmsg = msg
+                if xparsemode.upper() == "IRC":
+                    xmsg = ircToHTML(xmsg)
+                    xparsemode = "HTML"
+                return bot.sendMessage(chat_id=chat_id, text=xmsg, parse_mode=xparsemode)
             except BadRequest as e:
                 return bot.sendMessage(chat_id=chat_id, text=msg + "\n\n(Error: " + e.message + ")")
         else:
@@ -129,7 +164,7 @@ def main():
     bot = None
     botnick = "bot"
     connected = False
-    parse_mode = None
+    parse_mode = "IRC"
     
     try:
         send("X :Waiting for PASS with Telegram bot token")
@@ -158,7 +193,7 @@ def main():
                     connected = True
                     send(":" + SERVER_NAME + " 001 " + botnick + " :Welcome to Telegram")
                     send((":" + SERVER_NAME + " 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii" +
-                        " CHANTYPES=#&!+ TPARSEMODE=IRC,HTML,Markdown NICKLEN=500 :are supported by this server"))
+                        " CHANTYPES=#&!+ TPARSEMODE=IRC,Plain,HTML,Markdown NICKLEN=500 :are supported by this server"))
                     send(":" + SERVER_NAME + " 422 " + botnick + " :No MOTD")
             elif cmd == "USER":
                 pass
@@ -185,8 +220,8 @@ def main():
                 pass
             elif cmd == "TPARSEMODE":
                 if len(args) > 0:
-                    parse_mode = None if args[0].upper() == "IRC" else args[0]
-                send(":" + SERVER_NAME + " 300 :" + ("IRC" if not parse_mode else parse_mode))
+                    parse_mode = None if args[0].upper() == "PLAIN" else args[0]
+                send(":" + SERVER_NAME + " 300 :" + ("Plain" if not parse_mode else parse_mode))
             elif cmd == "QUIT":
                 send("X :Quit: " + ("" if len(args) == 0 else args[0]))
                 break
