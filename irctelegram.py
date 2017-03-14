@@ -165,7 +165,11 @@ def main():
     botnick = "bot"
     connected = False
     parse_mode = "IRC"
-    
+
+    batching = False
+    batchtarget = ""
+    batchmsg = ""
+
     try:
         send("X :Waiting for PASS with Telegram bot token")
         import sys
@@ -193,7 +197,7 @@ def main():
                     connected = True
                     send(":" + SERVER_NAME + " 001 " + botnick + " :Welcome to Telegram")
                     send((":" + SERVER_NAME + " 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii" +
-                        " CHANTYPES=#&!+ TPARSEMODE=IRC,Plain,HTML,Markdown NICKLEN=500 :are supported by this server"))
+                        " CHANTYPES=#&!+ TPARSEMODE=IRC,Plain,HTML,Markdown NICKLEN=500 TBATCHMSG :are supported by this server"))
                     send(":" + SERVER_NAME + " 422 " + botnick + " :No MOTD")
             elif cmd == "USER":
                 pass
@@ -201,15 +205,44 @@ def main():
                 pass
             elif cmd == "PART":
                 pass
+            elif cmd == "BATCH":
+                try:
+                    if batching and batchtarget and batchmsg:
+                        sendbotmsg(bot, batchtarget, batchmsg, parse_mode)
+                finally:
+                    batching = False
+                    batchtarget = ""
+                    batchmsg = ""
+                if len(args) >= 2 and args[0][0] == '+' and args[1] == SERVER_NAME + "/TBATCHMSG":
+                    batching = True
             elif cmd == "PRIVMSG":
                 if bot:
                     chat_id = target_to_chat_id(args[0])
-                    if args[1].startswith("\1ACTION "):
-                        sendbotmsg(bot, chat_id, " * " + botnick + " " + args[1][8:].rstrip("\1"), parse_mode)
-                    elif args[1].startswith("\1TELEGRAM-STICKER "):
-                        sendbotsticker(bot, chat_id, args[1][18:].rstrip("\1"))
-                    else:
-                        sendbotmsg(bot, chat_id, args[1], parse_mode)
+                    msg = args[1]
+                    sticker = msg[18:].rstrip("\1") if msg.startswith("\1TELEGRAM-STICKER ") else None
+                    if batching:
+                        if not batchtarget:
+                            batchtarget = chat_id
+                        if sticker is not None or batchtarget != chat_id:
+                            try:
+                                sendbotmsg(bot, batchtarget, batchmsg, parse_mode)
+                            finally:
+                                batching = False
+                                batchtarget = ""
+                                batchmsg = ""
+                    if sticker is not None:
+                        msg = ""
+                        sendbotsticker(bot, chat_id, sticker)
+                    elif args[1].startswith("\1ACTION "):
+                        msg = args[1][8:].rstrip("\1")
+                    if msg:
+                        if batchtarget == chat_id:
+                            if batchmsg:
+                                batchmsg += "\n" + msg
+                            else:
+                                batchmsg = msg
+                        else:
+                            sendbotmsg(bot, chat_id, msg, parse_mode)
             elif cmd == "NOTICE":
                 if bot:
                     chat_id = target_to_chat_id(args[0])
