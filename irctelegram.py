@@ -203,7 +203,7 @@ def main():
                     send(":" + SERVER_NAME + " 422 " + botnick + " :No MOTD")
             elif cmd == "TSLEEP":
                 if len(args) > 0:
-                    tsleep = int(args[0])
+                    tsleep = float(args[0])
                 send(":" + SERVER_NAME + " 300 " + cmd + " :" + str(tsleep))
             elif cmd == "USER":
                 anywork = False
