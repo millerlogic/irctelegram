@@ -3,6 +3,7 @@
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
 from telegram.error import BadRequest
+import time
 import logging
 
 # Enable logging
@@ -165,7 +166,7 @@ def main():
     botnick = "bot"
     connected = False
     parse_mode = "IRC"
-
+    tsleep = 0
     batching = False
     batchtarget = ""
     batchmsg = ""
@@ -180,6 +181,7 @@ def main():
             prefix, cmd_orig, args = irc_parse(line)
             cmd = cmd_orig.upper()
             chat_id = None # make sure this isn't set to the old value.
+            anywork = True
             if cmd == "PASS":
                 if not updater:
                     updater = Updater(args[0])
@@ -197,18 +199,24 @@ def main():
                     connected = True
                     send(":" + SERVER_NAME + " 001 " + botnick + " :Welcome to Telegram")
                     send((":" + SERVER_NAME + " 005 " + botnick + " NETWORK=Telegram CASEMAPPING=ascii" +
-                        " CHANTYPES=#&!+ TPARSEMODE=IRC,Plain,HTML,Markdown NICKLEN=500 TBATCHMSG :are supported by this server"))
+                        " CHANTYPES=#&!+ TPARSEMODE=IRC,Plain,HTML,Markdown NICKLEN=500 TSLEEP TBATCHMSG :are supported by this server"))
                     send(":" + SERVER_NAME + " 422 " + botnick + " :No MOTD")
+            elif cmd == "TSLEEP":
+                if len(args) > 0:
+                    tsleep = int(args[0])
+                send(":" + SERVER_NAME + " 300 " + cmd + " :" + str(tsleep))
             elif cmd == "USER":
-                pass
+                anywork = False
             elif cmd == "JOIN":
-                pass
+                anywork = False
             elif cmd == "PART":
-                pass
+                anywork = False
             elif cmd == "BATCH":
+                anywork = False
                 try:
                     if batching and batchtarget and batchmsg:
                         sendbotmsg(bot, batchtarget, batchmsg, parse_mode)
+                        anywork = True
                 finally:
                     batching = False
                     batchtarget = ""
@@ -241,6 +249,7 @@ def main():
                                 batchmsg += "\n" + msg
                             else:
                                 batchmsg = msg
+                            anywork = False
                         else:
                             sendbotmsg(bot, chat_id, msg, parse_mode)
             elif cmd == "NOTICE":
@@ -254,13 +263,17 @@ def main():
             elif cmd == "TPARSEMODE":
                 if len(args) > 0:
                     parse_mode = None if args[0].upper() == "PLAIN" else args[0]
-                send(":" + SERVER_NAME + " 300 :" + ("Plain" if not parse_mode else parse_mode))
+                send(":" + SERVER_NAME + " 300 " + cmd + " :" + ("Plain" if not parse_mode else parse_mode))
             elif cmd == "QUIT":
                 send("X :Quit: " + ("" if len(args) == 0 else args[0]))
                 break
-            elif cmd:
+            elif cmd == "":
+                anywork = False
+            else:
                 send(":" + SERVER_NAME + " 421 " + cmd + " :Unknown command")
             flush()
+            if anywork:
+                time.sleep(tsleep)
     except KeyboardInterrupt as e:
         send("X :Interrupted")
     except Exception as e:
