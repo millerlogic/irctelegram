@@ -189,6 +189,7 @@ def main():
                     bot = dp.bot
                     #dp.add_handler(CommandHandler("start", start))
                     dp.add_handler(MessageHandler([Filters.text], on_msg))
+                    dp.add_handler(MessageHandler([Filters.command], on_msg))
                     dp.add_handler(MessageHandler([Filters.sticker], on_sticker))
                     dp.add_error_handler(error) # log all errors
                     #updater.job_queue.put(Job(asdfasdf, 10, repeat=True, context=None))
