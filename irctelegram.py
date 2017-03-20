@@ -45,9 +45,9 @@ def target_to_chat_id(target):
 
 def get_msg_info(bot, update):
     fromuser = update.message.from_user
-    ident = safename(fromuser.username) if fromuser.username else str(fromuser.id)
+    subdomain = safename(fromuser.username) if fromuser.username else str(fromuser.id)
     nick = nickfromuser(fromuser)
-    fromwho = nick + "!" + ident + "@" + str(fromuser.id) + "." + SERVER_NAME
+    fromwho = nick + "!" + str(fromuser.id) + "@" + subdomain + "." + SERVER_NAME
     target = str(update.message.chat_id)
     if update.message.chat.type == "channel":
         target = "+" + target
