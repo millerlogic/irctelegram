@@ -187,6 +187,7 @@ def main():
                     updater = Updater(args[0])
                     dp = updater.dispatcher
                     bot = dp.bot
+                    botnick = bot.username or botnick
                     #dp.add_handler(CommandHandler("start", start))
                     dp.add_handler(MessageHandler([Filters.text], on_msg))
                     dp.add_handler(MessageHandler([Filters.command], on_msg))
@@ -195,7 +196,7 @@ def main():
                     #updater.job_queue.put(Job(asdfasdf, 10, repeat=True, context=None))
                     updater.start_polling()
             elif cmd == "NICK":
-                botnick = args[0]
+                #botnick = args[0]
                 if not connected:
                     connected = True
                     send(":" + SERVER_NAME + " 001 " + botnick + " :Welcome to Telegram")
