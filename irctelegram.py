@@ -145,7 +145,7 @@ def sendbotmsg(bot, chat_id, msg, parse_mode=None):
         else:
             return bot.sendMessage(chat_id=chat_id, text=msg)
     except Exception as e:
-        send("X :Unable to send message: " + e.message)
+        send("X :Unable to send message: " + repr(e))
         return False
 
 
