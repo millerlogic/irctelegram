@@ -144,18 +144,20 @@ def sendbotmsg(bot, chat_id, msg, parse_mode=None):
                 return bot.sendMessage(chat_id=chat_id, text=msg + "\n\n(Error: " + e.message + ")")
         else:
             return bot.sendMessage(chat_id=chat_id, text=msg)
-    except BadRequest as e:
+    except Exception as e:
         send("X :Unable to send message: " + e.message)
+        return False
 
 
 def sendbotsticker(bot, chat_id, sticker):
     try:
         try:
-            bot.sendSticker(chat_id=chat_id, sticker=sticker)
+            return bot.sendSticker(chat_id=chat_id, sticker=sticker)
         except BadRequest as e:
             return bot.sendMessage(chat_id=chat_id, text="(sticker)\n\n(Error: " + e.message + ")")
-    except BadRequest as e:
+    except Exception as e:
         send("X :Unable to send sticker: " + repr(sticker))
+        return False
 
 
 def main():
