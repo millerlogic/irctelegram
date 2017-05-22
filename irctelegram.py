@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 SERVER_NAME = "irctelegram.bridge"
 
+caps_supported = ["extended-join", "account-notify"]
+caps_enabled = []
+nicklists = {}
+
 
 def send(line):
     import sys
@@ -45,9 +49,9 @@ def target_to_chat_id(target):
 
 def get_msg_info(bot, update):
     fromuser = update.message.from_user
-    subdomain = safename(fromuser.username) if fromuser.username else str(fromuser.id)
+    account = safename(fromuser.username) if fromuser.username else str(fromuser.id)
     nick = nickfromuser(fromuser)
-    fromwho = nick + "!" + str(fromuser.id) + "@" + subdomain + "." + SERVER_NAME
+    fromwho = nick + "!" + str(fromuser.id) + "@" + account + "." + SERVER_NAME
     target = str(update.message.chat_id)
     if update.message.chat.type == "channel":
         target = "+" + target
@@ -55,11 +59,35 @@ def get_msg_info(bot, update):
         target = "#" + target
     else:
         target = "&" + target
-    return nick, fromwho, target
+    fullname = ((fromuser.first_name or "") + " " + (fromuser.last_name or "")).strip()
+    return nick, fromwho, target, account, fullname
+
+
+def see_user(nick, fromwho, target, account, fullname):
+    ltarget = target.lower()
+    nl = nicklists.get(ltarget)
+    if not nl:
+        nl = {}
+        nicklists[ltarget] = nl
+    lnick = nick.lower()
+    nickinfo = nl.get(lnick)
+    if not nickinfo:
+        nickinfo = {}
+        nl[lnick] = nickinfo
+        if "extended-join" in caps_enabled:
+            xacct = account if account else "*"
+            xfullname = fullname if fullname else ""
+            send(":" + fromwho + " JOIN " + target + " " + xacct + " :" + xfullname)
+        else:
+            send(":" + fromwho + " JOIN " + target)
+    nickinfo["nick"] = nick
+    #nickinfo["addr"] = fromwho
+    #nickinfo["fname"] = fullname
 
 
 def on_msg(bot, update):
-    _, fromwho, target = get_msg_info(bot, update)
+    nick, fromwho, target, account, fullname = get_msg_info(bot, update)
+    see_user(nick, fromwho, target, account, fullname)
     before = ":" + fromwho + " PRIVMSG " + target + " :"
     for msg in update.message.text.splitlines():
         if update.message.forward_from:
@@ -70,7 +98,8 @@ def on_msg(bot, update):
 
 
 def on_sticker(bot, update):
-    _, fromwho, target = get_msg_info(bot, update)
+    nick, fromwho, target, account, fullname = get_msg_info(bot, update)
+    see_user(nick, fromwho, target, account, fullname)
     sticker = update.message.sticker
     sticker_id = sticker.file_id
     send(":" + fromwho + " PRIVMSG " + target + " :\1TELEGRAM-STICKER " + str(sticker_id) + "\1")
@@ -271,6 +300,37 @@ def main():
             elif cmd == "QUIT":
                 send("X :Quit: " + ("" if len(args) == 0 else args[0]))
                 break
+            elif cmd == "CAP":
+                subcmd = args[0].upper() if len(args) > 0 else ""
+                if subcmd == "LS":
+                    # List supported caps.
+                    send("CAP " + botnick + " ACK :" + " ".join(caps_supported))
+                elif subcmd == "REQ":
+                    # Doesn't bother with capability modifiers.
+                    new_caps_str = args[1] if len(args) > 1 else ""
+                    new_caps = new_caps_str.split()
+                    okcaps = True
+                    if new_caps:
+                        for newcap in new_caps:
+                            if newcap not in caps_supported:
+                                okcaps = False
+                                break
+                        if okcaps:
+                            for newcap in new_caps:
+                                if newcap not in caps_enabled:
+                                    caps_enabled.append(newcap)
+                    if okcaps:
+                        send("CAP " + botnick + " ACK :" + new_caps_str)
+                    else:
+                        send("CAP " + botnick + " NAK :" + new_caps_str)
+                elif subcmd == "LIST":
+                    # List enabled caps.
+                    send("CAP " + botnick + " ACK :" + " ".join(caps_enabled))
+                elif subcmd == "END":
+                    pass
+                else:
+                    send(":" + SERVER_NAME + " 410 " + (args[0].partition(' ')[0] if len(args) > 0 else "") + " :Invalid CAP subcommand")
+                anywork = False
             elif cmd == "":
                 anywork = False
             else:
