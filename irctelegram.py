@@ -264,7 +264,7 @@ def main():
                     if batching:
                         if not batchtarget:
                             batchtarget = chat_id
-                        if sticker is not None or batchtarget != chat_id:
+                        if batchmsg and (sticker is not None or batchtarget != chat_id):
                             try:
                                 sendbotmsg(bot, batchtarget, batchmsg, parse_mode)
                             finally:
