@@ -1,16 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job, InlineQueryHandler, CallbackQueryHandler, ChosenInlineResultHandler
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ChosenInlineResult
 from telegram.error import BadRequest
 import time
 import logging
+from uuid import uuid4
+
+from telegram import InlineQueryResultArticle, ParseMode, \
+    InputTextMessageContent
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.WARN)
 
 logger = logging.getLogger(__name__)
+#logger.setLevel(logging.DEBUG)
 
 
 SERVER_NAME = "irctelegram.bridge"
@@ -47,11 +53,15 @@ def target_to_chat_id(target):
     return target
 
 
-def get_msg_info(bot, update):
-    fromuser = update.message.from_user
+def get_fulladdr_from_user(fromuser):
     account = safename(fromuser.username) if fromuser.username else str(fromuser.id)
     nick = nickfromuser(fromuser)
-    fromwho = nick + "!" + str(fromuser.id) + "@" + account + "." + SERVER_NAME
+    return nick + "!" + str(fromuser.id) + "@" + account + "." + SERVER_NAME, nick, account
+
+
+def get_msg_info(bot, update):
+    fromuser = update.message.from_user
+    fromwho, nick, account = get_fulladdr_from_user(fromuser)
     target = str(update.message.chat_id)
     if update.message.chat.type == "channel":
         target = "+" + target
@@ -107,7 +117,7 @@ def on_sticker(bot, update):
 
 
 def error(bot, update, error):
-    logger.warn('Update "%s" caused error "%s"' % (update, error))
+    logger.warn('Update "%s" caused error "%s"', update, error, exc_info=True)
 
 
 def irc_parse(s):
@@ -159,6 +169,18 @@ def ircToHTML(msg):
     return xmsg
 
 
+def _sendbotmsg(bot, chat_id, msg, parse_mode=None):
+    if chat_id.startswith("!i:"):
+        _, _, inline_msg_id = chat_id[3:].partition('@')
+        if parse_mode:
+            return bot.edit_message_text(inline_message_id=inline_msg_id, text=msg, parse_mode=parse_mode)
+        return bot.edit_message_text(inline_message_id=inline_msg_id, text=msg)
+    else:
+        if parse_mode:
+            return bot.sendMessage(chat_id=chat_id, text=msg, parse_mode=parse_mode)
+        return bot.sendMessage(chat_id=chat_id, text=msg)
+
+
 def sendbotmsg(bot, chat_id, msg, parse_mode=None):
     try:
         if parse_mode:
@@ -168,11 +190,11 @@ def sendbotmsg(bot, chat_id, msg, parse_mode=None):
                 if xparsemode.upper() == "IRC":
                     xmsg = ircToHTML(xmsg)
                     xparsemode = "HTML"
-                return bot.sendMessage(chat_id=chat_id, text=xmsg, parse_mode=xparsemode)
+                return _sendbotmsg(bot, chat_id, xmsg, xparsemode)
             except BadRequest as e:
-                return bot.sendMessage(chat_id=chat_id, text=msg + "\n\n(Error: " + e.message + ")")
+                return _sendbotmsg(bot, chat_id, msg + "\n\n(Error: " + e.message + ")")
         else:
-            return bot.sendMessage(chat_id=chat_id, text=msg)
+            return _sendbotmsg(bot, chat_id, msg)
     except Exception as e:
         send("X :Unable to send message: " + repr(e))
         return False
@@ -187,6 +209,48 @@ def sendbotsticker(bot, chat_id, sticker):
     except Exception as e:
         send("X :Unable to send sticker: " + repr(sticker))
         return False
+
+
+def on_inlinequery(bot, update):
+    rawquery = update.inline_query.query
+    qlines = rawquery.splitlines()
+    if len(qlines) > 0:
+        query = qlines[0]
+        results = [
+            InlineQueryResultArticle(
+                id=uuid4(),
+                title="Send to Bot:\n" + query[:20] + ('...' if len(query) > 20 else ''),
+                reply_markup=InlineKeyboardMarkup([[
+                    # A button is required to get an inline_message_id.
+                    InlineKeyboardButton('Loading...', callback_data="loading")
+                ]]),
+                input_message_content=InputTextMessageContent(query)),
+        ]
+        update.inline_query.answer(results, is_personal=True, cache_time=3)
+
+
+def on_inlinequeryresult(bot, update):
+    # update.chosen_inline_result = ChosenInlineResult
+    inline_msg_id = update.chosen_inline_result.inline_message_id
+    if not inline_msg_id:
+        logger.error("NO MSG ID")
+        return
+    rawquery = update.chosen_inline_result.query
+    #bot.edit_message_text(inline_message_id=inline_msg_id, text=rawquery + "\n...")#
+    fromwho, _, account = get_fulladdr_from_user(update.chosen_inline_result.from_user)
+    #see_user(nick, fromwho, target, account, fullname) # doesn't apply here, it's not a channel.
+    target = "!i:" + account + "@" + str(inline_msg_id)
+    qlines = rawquery.splitlines()
+    if len(qlines) > 0:
+        query = qlines[0]
+        send(":" + fromwho + " PRIVMSG " + target + " :" + query)
+        flush()
+
+
+def on_button_pressed(bot, update):
+    #data = update.callback_query.data
+    update.callback_query.answer()
+    #update.callback_query.edit_message_text(text=data + "\n\nClicked!")
 
 
 def main():
@@ -223,6 +287,9 @@ def main():
                     dp.add_handler(MessageHandler([Filters.text], on_msg))
                     dp.add_handler(MessageHandler([Filters.command], on_msg))
                     dp.add_handler(MessageHandler([Filters.sticker], on_sticker))
+                    dp.add_handler(InlineQueryHandler(on_inlinequery))
+                    dp.add_handler(ChosenInlineResultHandler(on_inlinequeryresult))
+                    updater.dispatcher.add_handler(CallbackQueryHandler(on_button_pressed))
                     dp.add_error_handler(error) # log all errors
                     #updater.job_queue.put(Job(asdfasdf, 10, repeat=True, context=None))
                     updater.start_polling()
