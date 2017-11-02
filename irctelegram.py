@@ -5,6 +5,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Job, 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ChosenInlineResult
 from telegram.error import BadRequest
 import time
+from datetime import datetime, timedelta
 import logging
 from uuid import uuid4
 
@@ -145,10 +146,14 @@ irc_parse_rex = re.compile("\x1f|\x12|\x16|\x03(?:\\d{1,2}(?:,\\d{1,2})?)?", re.
 irc_handle_rex = re.compile("\x02|\x0F", re.UNICODE)
 
 
+def escapeHTML(msg):
+    import cgi
+    return cgi.escape(msg)
+
+
 def ircToHTML(msg):
     xmsg = irc_parse_rex.sub("", msg)
-    import cgi
-    xmsg = cgi.escape(xmsg)
+    xmsg = escapeHTML(xmsg)
     state = {"bold":False}
     def handlebold(x):
         if x == "\x0F":
@@ -169,12 +174,45 @@ def ircToHTML(msg):
     return xmsg
 
 
+queries = []
+
+def find_query(inline_msg_id):
+    now = datetime.now()
+    expire = timedelta(minutes=1)
+    global queries
+    i = 0
+    while True:
+        if i >= len(queries):
+            break
+        q = queries[i]
+        if now - q["t"] > expire:
+            # Expired, remove it.
+            queries[i] = queries[len(queries)-1]
+            queries = queries[:len(queries)-1]
+            continue # Stay on same index.
+        if q["i"] == inline_msg_id:
+            q["t"] = now
+            return q
+        i += 1
+
+def add_query(q):
+    find_query("") # Expire old ones.
+    queries.append(q)
+
+
 def _sendbotmsg(bot, chat_id, msg, parse_mode=None):
     if chat_id.startswith("!i:"):
         _, _, inline_msg_id = chat_id[3:].partition('@')
-        if parse_mode:
-            return bot.edit_message_text(inline_message_id=inline_msg_id, text=msg, parse_mode=parse_mode)
-        return bot.edit_message_text(inline_message_id=inline_msg_id, text=msg)
+        q = find_query(inline_msg_id)
+        if not q:
+            print("X :Could not find inline message id " + inline_msg_id)
+            flush()
+            return
+        if parse_mode == "HTML":
+            q["m"] += ("\n" if q["m"] else "") + msg
+        else:
+            q["m"] += ("\n" if q["m"] else "") + escapeHTML(msg)
+        return bot.edit_message_text(inline_message_id=inline_msg_id, text=q["m"], parse_mode="HTML")
     else:
         if parse_mode:
             return bot.sendMessage(chat_id=chat_id, text=msg, parse_mode=parse_mode)
@@ -224,7 +262,7 @@ def on_inlinequery(bot, update):
                     # A button is required to get an inline_message_id.
                     InlineKeyboardButton('Loading...', callback_data="loading")
                 ]]),
-                input_message_content=InputTextMessageContent(query)),
+                input_message_content=InputTextMessageContent(query, parse_mode="HTML")),
         ]
         update.inline_query.answer(results, is_personal=True, cache_time=3)
 
@@ -243,6 +281,7 @@ def on_inlinequeryresult(bot, update):
     qlines = rawquery.splitlines()
     if len(qlines) > 0:
         query = qlines[0]
+        add_query({"i":inline_msg_id, "t":datetime.now(), "m":query}) # query is already HTML
         send(":" + fromwho + " PRIVMSG " + target + " :" + query)
         flush()
 
