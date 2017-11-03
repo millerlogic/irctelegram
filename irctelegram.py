@@ -201,8 +201,8 @@ def add_query(q):
 
 
 def _sendbotmsg(bot, chat_id, msg, parse_mode=None):
-    if chat_id.startswith("!i:"):
-        _, _, inline_msg_id = chat_id[3:].partition('@')
+    if chat_id.startswith("?i:"):
+        inline_msg_id = chat_id[3:]
         q = find_query(inline_msg_id)
         if not q:
             print("X :Could not find inline message id " + inline_msg_id)
@@ -275,9 +275,8 @@ def on_inlinequeryresult(bot, update):
         return
     rawquery = update.chosen_inline_result.query
     #bot.edit_message_text(inline_message_id=inline_msg_id, text=rawquery + "\n...")#
-    fromwho, _, account = get_fulladdr_from_user(update.chosen_inline_result.from_user)
-    #see_user(nick, fromwho, target, account, fullname) # doesn't apply here, it's not a channel.
-    target = "!i:" + account + "@" + str(inline_msg_id)
+    fromwho, _, _ = get_fulladdr_from_user(update.chosen_inline_result.from_user)
+    target = "?i:" + str(inline_msg_id) # PM with different target.
     qlines = rawquery.splitlines()
     if len(qlines) > 0:
         query = qlines[0]
